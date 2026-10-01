@@ -1,6 +1,6 @@
 #Private_EC2_IAM_Role & Instance Profile for EC2 instances in private subnets
 resource "aws_iam_role" "ec2_private_role" {
-name = "ec2-private-role-production" 
+name = "ec2-private-App-Tier" 
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
