@@ -32,7 +32,7 @@ resource "aws_iam_role_policy_attachment" "rds_attach_full_access" {
   
 }
 resource "aws_iam_instance_profile" "ec2_profile" {  # To Attach the IAM Role to EC2 Instances
-  name = "ec2-private-profile-production" 
+  name = "ec2-private-profile-app-tier" 
   role = aws_iam_role.ec2_private_role.name
 }
 
