@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node test.js"
+    "test": "node unit.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
