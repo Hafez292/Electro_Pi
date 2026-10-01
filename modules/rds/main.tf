@@ -40,7 +40,7 @@ resource "aws_db_instance" "db" {
   monitoring_role_arn                   = null 
 
   # Standard operational requirements 
-  license_model        = "general-public-license"
+  license_model        = "postgresql-license"
   skip_final_snapshot  = true
   multi_az = false 
 
