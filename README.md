@@ -1,4 +1,4 @@
-# Electro Pi
+# ⚡ Electro Pi
 
 ![Node.js 20](https://img.shields.io/badge/Node.js-20-339933?logo=nodedotjs&logoColor=white)
 ![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
@@ -6,91 +6,181 @@
 ![Docker](https://img.shields.io/badge/Containers-Docker-2496ED?logo=docker&logoColor=white)
 ![AWS](https://img.shields.io/badge/Cloud-AWS-232F3E?logo=amazonaws&logoColor=white)
 
-Electro Pi is a three-tier web application assessment project. The frontend is a static page served by Nginx, the application tier is a Node.js/Express API, and the data tier is PostgreSQL. Terraform provisions AWS networking, EC2 instances, IAM/security-group resources, and an RDS database. GitHub Actions has separate workflows for application image deployment and infrastructure operations.
+Electro Pi is a three-tier web application assessment project with a static Nginx frontend, a Node.js/Express API, and PostgreSQL. Terraform provisions AWS networking, EC2, IAM/security-group resources, and a private RDS database, while GitHub Actions provides application-image deployment and infrastructure workflows.
 
-> **Deployment reality:** the runtime diagram below describes the application's intended request path. The checked-in AWS deployment provisions EC2 instances and the application workflows deploy to EC2 over SSH; there is no ECS service or task definition in this repository. Some requested local/production capabilities are not yet configured; see the notes in the relevant sections.
+> **Deployment note:** the intended application flow is Nginx → Express API → PostgreSQL. The checked-in AWS deployment provisions EC2 and deploys to EC2 over SSH; there is no ECS service or task definition in this repository. The Compose file is empty, and some local/production capabilities are not yet configured; those limitations are called out below.
 
-## Architecture overview
+---
+
+## 🏗️ Architecture at a glance
 
 ```text
-                         Presentation tier
-  Browser ──HTTP :80──> Nginx frontend (static HTML)
-                              │
-                              │ /api/* reverse proxy
-                              ▼
-                         Application tier
-                Node.js / Express API :5000 <── GET /health
-                              │
-                              │ SQL: SELECT NOW()
-                              ▼
-                       Data tier
-                  AWS RDS PostgreSQL :5432
+                         PRESENTATION TIER
+  Browser ── HTTP :80 ──> Nginx frontend (static HTML)
+                                 │
+                                 │ /api/* reverse proxy
+                                 ▼
+                         APPLICATION TIER
+                 Node.js / Express API :5000 <── GET /health
+                                 │
+                                 │ SQL: SELECT NOW()
+                                 ▼
+                            DATA TIER
+                    AWS RDS PostgreSQL :5432
 ```
 
-The frontend calls `/api/data` using a relative URL. Nginx serves the static page and proxies `/api/` requests to the upstream named `backend-api` on port `5000`. The API uses the `pg` connection pool and environment variables to connect to PostgreSQL. In the Terraform environment, EC2 instances are created for the web tier, application tier, and a bastion host, while RDS is configured as a private PostgreSQL instance.
+| Tier | Component | Responsibility | Configuration |
+| --- | --- | --- | --- |
+| **Presentation** | Nginx frontend | Serves the static page and proxies `/api/` to the backend. | `app/frontend/index.html`, `app/frontend/nginx.conf`; listens on port `80`, upstream `backend-api:5000`. |
+| **Application** | Node.js / Express | Exposes health and data endpoints; uses the `pg` pool to access PostgreSQL. | `app/backend/server.js`; default port `5000`; environment-configured DB connection. |
+| **Data** | AWS RDS PostgreSQL | Stores application data; the current example query returns the database server time. | Terraform module configures PostgreSQL `16.3`, private subnets, and port `5432` as the application default. |
 
-## Repository structure
+The frontend calls `/api/data` with a relative URL. Nginx proxies `/api/` requests to `http://backend-api:5000/api/`. The API's `/health` route checks that the process responds, while `/api/data` executes `SELECT NOW()`. The production Terraform EC2 layer creates instances named `Bastion_Host`, `Application_Tier`, and `Web_Tier`, alongside the private RDS instance.
+
+---
+
+## 🗺️ Repository map
+
+<details>
+<summary>Expand the annotated repository tree</summary>
 
 ```text
 .
 ├── app/
 │   ├── backend/
 │   │   ├── Dockerfile             # Node 20 Alpine multi-stage API image
-│   │   ├── package.json           # Express, CORS, PostgreSQL client and npm scripts
+│   │   ├── package.json           # Express, CORS, pg, start/test scripts
 │   │   ├── server.js              # Express routes and PostgreSQL pool
 │   │   └── unit.js                # Minimal Node test script
 │   ├── frontend/
 │   │   ├── Dockerfile             # Nginx Alpine static-site image
 │   │   ├── index.html             # Demo UI; calls /api/data
-│   │   └── nginx.conf             # Static hosting and /api/ proxy
-│   └── docker_compose.yml         # Currently empty; no Compose services are defined
+│   │   └── nginx.conf             # Static hosting and /api/ reverse proxy
+│   └── docker_compose.yml         # Zero-byte file; no services are defined
 ├── environment/
 │   └── production/
-│       ├── vpc_layer/             # VPC, subnets, routes; remote state in S3
+│       ├── vpc_layer/             # VPC, subnets, routes; S3 remote state
 │       ├── permission_layer/      # Security groups and EC2 IAM role/profile
-│       ├── ec2_layer/             # Bastion, application-tier, and web-tier EC2 instances
+│       ├── ec2_layer/             # Bastion, app-tier, and web-tier EC2 instances
 │       └── rds_layer/             # Private RDS PostgreSQL instance
 ├── modules/
 │   ├── ec2/                       # Reusable Ubuntu EC2 instance
-│   ├── rds/                       # Reusable RDS PostgreSQL instance and subnet group
-│   └── vpc/                       # VPC, public/private subnets, gateways, and route tables
+│   ├── rds/                       # RDS PostgreSQL instance and subnet group
+│   └── vpc/                       # VPC, subnets, gateways, and route tables
 ├── .github/
 │   └── workflows/
-│       ├── backend_pipe.yml       # Backend test, ECR push, and EC2 deployment
+│       ├── backend_pipe.yml       # Backend test, ECR push, EC2 deployment
 │       ├── frontend_pipeline.yml  # Frontend ECR push and EC2 deployment
-│       ├── infra.yml              # Manually dispatched Terraform apply
-│       └── destroy_ifra_prod.yml  # Manually dispatched Terraform destroy
+│       ├── infra.yml              # Manual Terraform apply workflow
+│       └── destroy_ifra_prod.yml  # Manual Terraform destroy workflow
 └── README.md
 ```
 
-Terraform modules are in the repository-root `modules/` directory, not `terraform/modules/`. The layer configurations are under `environment/production/`. The Compose file is named `app/docker_compose.yml` (underscore), not a root-level `docker-compose.yml`.
+</details>
 
-## Infrastructure as Code (Terraform)
+Terraform modules are in the repository-root **`modules/`** folder, not `terraform/modules/`. Layer configurations are under **`environment/production/`**. The Compose file is **`app/docker_compose.yml`** (underscore), not a root-level `docker-compose.yml`.
 
-Terraform is split into four production layers. Each layer has its own Terraform configuration and S3 state key in the `electro-terraform` bucket in `us-east-1`. The configurations require Terraform `>= 1.13.0` and AWS provider `6.28.0`.
+---
 
-| Layer/module | Resources and purpose |
+## 🚀 Prerequisites & quickstart
+
+### Prerequisites
+
+| Tool / dependency | Purpose |
 | --- | --- |
-| `modules/vpc` | VPC, public/private subnets, Internet Gateway, NAT Gateway, Elastic IP, route tables, and subnet associations. |
-| `modules/ec2` | Ubuntu 24.04 EC2 instance using the requested instance type, subnet, security group, key pair, optional IAM profile, and a `gp3` root volume. |
-| `modules/rds` | PostgreSQL 16.3 RDS instance and DB subnet group, using `gp3` storage with 20 GB allocated and a 100 GB autoscaling maximum. It is configured as non-public and single-AZ. |
-| `environment/production/permission_layer` | Security groups plus an EC2 instance role/profile. The role has SSM, ECR read-only, EC2 read-only, and RDS full-access managed policies attached. |
+| Docker Engine and Docker Compose plugin | Build and run the container stack once Compose services are defined. |
+| Node.js 20 and npm | Run backend checks and tests locally. |
+| Terraform `>= 1.13.0` and AWS CLI credentials | Optional: provision the production AWS environment. |
+| AWS S3 bucket `electro-terraform` in `us-east-1` | Existing remote-state backend; Terraform does not create this bucket. |
+| EC2 key pair configured in `environment/production/ec2_layer/terraform.tfvars` | Required by the production EC2 layer. |
 
-The production EC2 layer instantiates the EC2 module three times: `Bastion_Host`, `Application_Tier`, and `Web_Tier`. VPC, permission, EC2, and RDS state are read separately through Terraform's S3 remote-state data sources. There are no Terraform ECS or ECR modules in this checkout; the application workflows assume the ECR repositories already exist.
+### Local development
 
-### Security and monitoring configuration
+1. **Inspect the Compose configuration.** `app/docker_compose.yml` is currently zero bytes. It defines no frontend, API, or database services, so the full Compose stack cannot currently be built or started.
+2. **Run the available backend checks** from the backend directory:
 
-- RDS is placed in private subnets and has `publicly_accessible = false`.
-- RDS Performance Insights is enabled with a 7-day retention period. RDS Enhanced Monitoring is disabled (`monitoring_interval = 0`).
-- The Terraform does **not** define CloudWatch alarms or explicitly enable RDS storage encryption (`storage_encrypted` is not set).
-- The configured security groups are **not least-privilege**: the private EC2 group allows all inbound traffic from `0.0.0.0/0`; the public group includes all-protocol ingress from `0.0.0.0/0` and SSH from anywhere; and the RDS group opens TCP `1433` to `0.0.0.0/0`. PostgreSQL normally listens on `5432`, so the RDS rule also does not match the application's default DB port. Review and restrict these rules before using this configuration in a production environment.
-- Terraform marks database credentials as sensitive inputs, but credentials can still be stored in Terraform state. Protect the S3 state bucket and its access; do not commit credentials or state files.
+   ```bash
+   cd app/backend
+   npm install
+   node --check server.js
+   npm test --if-present
+   ```
 
-### Run Terraform locally
+   The API requires a reachable PostgreSQL database and `DB_HOST`, `DB_USER`, and `DB_PASSWORD` at runtime. The values of `DB_NAME` and `DB_PORT` default to `appdnb` and `5432`.
+3. **Use the Compose commands below when the file contains service definitions.** A runnable local stack needs frontend, API, and PostgreSQL services, port mappings, shared networking, and the backend database variables.
 
-Prerequisites: Terraform `1.13` or later, AWS CLI credentials authorized for the target account, an existing accessible S3 bucket named `electro-terraform` in `us-east-1`, and the EC2 key pair referenced by `environment/production/ec2_layer/terraform.tfvars`. The S3 backend bucket is not created by these configurations.
+<details>
+<summary>Docker Compose commands (after defining services)</summary>
 
-Set AWS credentials through your normal AWS profile/environment, then provide the RDS credentials without committing them. For example, the following prompts avoid echoing the password:
+```bash
+docker compose -f app/docker_compose.yml build
+docker compose -f app/docker_compose.yml up --detach
+docker compose -f app/docker_compose.yml logs --follow
+docker compose -f app/docker_compose.yml down
+```
+
+</details>
+
+### Container configuration
+
+| Image | Implemented practices and behavior |
+| --- | --- |
+| Backend — `app/backend/Dockerfile` | Two-stage build using `node:20-alpine`; installs production dependencies in the builder stage; copies app and `node_modules` to the runtime stage; runs as non-root `USER node`; exposes port `5000`. |
+| Frontend — `app/frontend/Dockerfile` | Uses `nginx:alpine`; removes the default site/config, copies the custom Nginx config and HTML, exposes port `80`, and runs Nginx in the foreground. |
+
+> **Backend image build caveat:** the Dockerfile uses `npm ci`, which requires a lockfile. There is no `package-lock.json` in `app/backend/` at present; generate and commit one before relying on the image build.
+
+### Backend environment variables
+
+| Variable | Required? | Default / use |
+| --- | --- | --- |
+| `PORT` | No | API listen port; defaults to `5000`. |
+| `DB_HOST` | Yes | PostgreSQL hostname or RDS endpoint. |
+| `DB_USER` | Yes | PostgreSQL username. |
+| `DB_PASSWORD` | Yes | PostgreSQL password. |
+| `DB_NAME` | No | Database name; defaults to `appdnb`. Set to an existing database on the target RDS instance. |
+| `DB_PORT` | No | PostgreSQL port; defaults to `5432`. |
+| `NODE_ENV` | No | When set to `production`, `pg` TLS is enabled with `rejectUnauthorized: false`. |
+
+No local database service or Compose health/dependency checks are currently configured.
+
+---
+
+## ☁️ Infrastructure & security (Terraform)
+
+Terraform is organized into four production layers. The layer configurations require Terraform **`>= 1.13.0`** and AWS provider **`6.28.0`**, use region **`us-east-1`**, and store state in the S3 bucket **`electro-terraform`**. The `modules/` folder contains the reusable resource modules; each environment layer composes those modules and reads dependencies through remote state.
+
+### Modules and layers
+
+| Module / layer | Provisions | Notable configuration |
+| --- | --- | --- |
+| `modules/vpc` | VPC, public/private subnets, Internet Gateway, NAT Gateway, Elastic IP, route tables, and subnet associations. | Production VPC CIDR `10.0.0.0/16`; public subnets `10.0.1.0/24`, `10.0.2.0/24`; private subnets `10.0.3.0/24`, `10.0.4.0/24`; AZ list `us-east-1a`, `us-east-1d`, `us-east-1c`; DNS hostnames enabled. |
+| `modules/ec2` | Ubuntu 24.04 EC2 instance with a selected subnet, security group, key pair, optional IAM instance profile, and root volume. | Production layer creates `Bastion_Host`, `Application_Tier`, and `Web_Tier`; production tfvars set `t3.micro`, key pair `7ader`, 20 GB `gp3` root volume, and production tags. Module defaults include `t2.micro` and an 8 GB `gp3` volume. |
+| `modules/rds` | RDS instance and DB subnet group. | PostgreSQL `16.3`, `db.t3.medium`, 20 GB `gp3` storage with max autoscaling allocation 100 GB, private (`publicly_accessible = false`), single-AZ. |
+| `environment/production/permission_layer` | Security groups, EC2 IAM role, and instance profile. | The role attaches `AmazonSSMManagedInstanceCore`, `AmazonEC2ContainerRegistryReadOnly`, `AmazonEC2ReadOnlyAccess`, and `AmazonRDSFullAccess`. |
+| `environment/production/{vpc,permission,ec2,rds}_layer` | Environment-specific composition, provider/backend config, variables, and outputs for the respective layer. | S3 state keys: `vpc/terraform.tfstate`, `permission/terraform.tfstate`, `ec2/terraform.tfstate`, `rds/terraform.tfstate`. |
+
+There are no Terraform **ECS** or **ECR** modules in this checkout. The application workflows expect ECR repositories to already exist.
+
+### Security and monitoring
+
+> **Production review required:** the checked-in network rules are not least-privilege. Restrict the exposed ingress before deploying this configuration in a production environment.
+
+| Control | Current configuration |
+| --- | --- |
+| RDS network placement | RDS uses private subnets and `publicly_accessible = false`. |
+| Security groups | Private EC2 ingress allows all protocols from `0.0.0.0/0`; the public group allows all-protocol ingress and SSH (`22`) from `0.0.0.0/0` (as well as HTTP `80` and HTTPS `443`); the RDS group allows TCP `1433` from `0.0.0.0/0`. PostgreSQL normally listens on `5432`, so the RDS ingress rule does not match the application's default DB port. |
+| Database monitoring | Performance Insights enabled with 7-day retention. Enhanced Monitoring disabled (`monitoring_interval = 0`). |
+| CloudWatch alarms | No CloudWatch alarms are defined in the Terraform configuration. |
+| Encryption at rest | The RDS module does not explicitly set `storage_encrypted`; encryption at rest is not configured in code. |
+| Credentials and state | DB variables are marked `sensitive` and passed via environment variables in Actions, but credentials may still be present in Terraform state. Protect the remote S3 bucket and its access; do not commit credentials or state files. |
+
+### Terraform local workflow
+
+Use an AWS profile or environment credentials authorized for the target account. The S3 backend bucket must already exist, and the EC2 key pair referenced in the production variables must be available. The following commands prompt for the DB credentials without echoing the password:
+
+<details>
+<summary>Expand local Terraform init, validate, plan, and apply commands</summary>
 
 ```bash
 export AWS_PROFILE=your-aws-profile
@@ -98,13 +188,8 @@ read -r -p "RDS username: " TF_VAR_db_username
 read -r -s -p "RDS password: " TF_VAR_db_password
 printf '\n'
 export TF_VAR_db_username TF_VAR_db_password
-```
 
-Initialize, validate, plan, and apply each layer in dependency order. Review each plan before approving the apply:
-
-```bash
 set -e
-
 for layer in vpc_layer permission_layer ec2_layer rds_layer; do
   dir="environment/production/${layer}"
   terraform -chdir="$dir" init
@@ -116,85 +201,96 @@ done
 unset TF_VAR_db_username TF_VAR_db_password
 ```
 
-Each layer uses remote state, so run them in order and ensure the prerequisite state has been applied. `terraform apply` provisions billable AWS resources. The repository also contains a manually dispatched workflow at `.github/workflows/destroy_ifra_prod.yml` that runs `terraform destroy`; use it only when intentional teardown is required.
+</details>
 
-## Containerization and local execution
+Apply layers in dependency order and review each plan before approving its apply. Each layer consumes outputs from previously applied remote state. `terraform apply` creates billable AWS resources. The manually dispatched **`.github/workflows/destroy_ifra_prod.yml`** workflow runs Terraform destroy in reverse dependency order; use it only for intentional teardown.
 
-### Backend image
+---
 
-`app/backend/Dockerfile` uses `node:20-alpine` in a two-stage build. It installs production dependencies in the builder stage and copies the resulting `node_modules` and app into the runtime stage. The runtime switches to the non-root `node` user and exposes port `5000`.
+## 🔄 CI/CD pipeline workflow
 
-There is currently no `package-lock.json` in `app/backend/`, but the Dockerfile runs `npm ci`. `npm ci` requires a lockfile, so generate and commit a lockfile before expecting the backend image build to succeed.
+There is no single four-stage ECS pipeline. Application workflows are separate and target EC2. The stage table below maps the requested **Build → Test → Package → Deploy** structure to what is actually present:
 
-### Frontend image
-
-`app/frontend/Dockerfile` uses `nginx:alpine`, copies the static HTML and custom Nginx configuration, and serves on port `80`. Nginx forwards `/api/` to `http://backend-api:5000/api/`; therefore the backend container/service must be addressable as `backend-api` on a shared container network.
-
-### Docker Compose status and commands
-
-`app/docker_compose.yml` is currently a zero-byte file. It defines no frontend, API, or database services, so there is not yet a runnable Compose stack in this repository. The correct Compose CLI syntax for this non-default file is:
-
-```bash
-# These commands are ready to use once app/docker_compose.yml defines the services.
-docker compose -f app/docker_compose.yml build
-docker compose -f app/docker_compose.yml up --detach
-docker compose -f app/docker_compose.yml logs --follow
-docker compose -f app/docker_compose.yml down
-```
-
-At present, Compose cannot build or start the three-tier application from that file. A working local stack needs service definitions for the frontend, the API (with `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, and `DB_PORT` configured), and PostgreSQL, plus port mappings and service networking. No local database service or Compose health/dependency checks are currently configured.
-
-The API's database defaults are `DB_NAME=appdnb` and `DB_PORT=5432`; `DB_HOST`, `DB_USER`, and `DB_PASSWORD` must be supplied. In production (`NODE_ENV=production`) the `pg` client enables TLS with certificate verification disabled. Set the database name to one that actually exists on the target RDS instance.
-
-## CI/CD (GitHub Actions)
-
-The repository uses separate workflows rather than one four-stage ECS pipeline:
-
-| Workflow | Trigger and behavior |
-| --- | --- |
-| `backend_pipe.yml` | Push to `main` affecting `app/backend/**`, or manual dispatch. Installs dependencies, checks JavaScript syntax, runs `npm test`, builds and pushes an image tagged `v1.0.<run number>` to ECR, then connects over SSH and recreates the backend container on an EC2 host. |
-| `frontend_pipeline.yml` | Push to `main` affecting `app/frontend/**`, or manual dispatch. Builds and pushes a versioned image to ECR, then connects over SSH and recreates the frontend container on EC2. It does not define a separate frontend test step. |
-| `infra.yml` | Manual dispatch only. Initializes, validates, plans, and applies the VPC, permissions, EC2, and RDS Terraform layers in that order. |
-| `destroy_ifra_prod.yml` | Manual dispatch only. Destroys the RDS, EC2, permissions, and VPC layers in reverse dependency order. |
-
-The backend workflow's stages are approximately **Install/check/test → Build and push to ECR → Deploy to EC2**. Frontend deployment has **Build and push → Deploy to EC2**. Neither app workflow deploys to ECS. Both workflows use AWS region `us-east-1`, ECR registry `557496517532.dkr.ecr.us-east-1.amazonaws.com`, and repositories `electro_backend` / `electro_frontend`. The registry and repository names are configured in workflow files, not provisioned by Terraform here.
-
-The backend push trigger also lists `.github/workflows/backend.yml` as a watched path, but the workflow file in this repository is `backend_pipe.yml`; changing only the workflow file therefore does not match that path filter. The backend app path and manual-dispatch triggers are present.
-
-### GitHub Actions secrets
-
-Add these secrets under the repository's **Settings → Secrets and variables → Actions**:
-
-| Secret | Used for |
-| --- | --- |
-| `AWS_ACCESS_KEY_ID` | AWS credentials for image publishing and Terraform workflows. |
-| `AWS_SECRET_ACCESS_KEY` | AWS credentials for image publishing and Terraform workflows. |
-| `DB_USERNAME` | Passed as `TF_VAR_db_username` to the Terraform apply/destroy RDS layer. |
-| `DB_PASSWORD` | Passed as `TF_VAR_db_password` to the Terraform apply/destroy RDS layer. |
-| `EC2_SSH_KEY` | SSH private key used by the backend and frontend deployment workflows. |
-
-GitHub secrets are referenced through the Actions secrets context rather than embedded as credential literals in the workflow. Terraform database variables are marked sensitive and passed via environment variables; they may nevertheless be present in Terraform state. Use narrowly scoped AWS credentials and protect both the repository secrets and remote state.
-
-> **Deployment prerequisites to verify:** the application workflows discover an instance tagged `Name=Test`, while the Terraform EC2 module creates instances named `Bastion_Host`, `Application_Tier`, and `Web_Tier`. They also SSH to `/home/ubuntu` and update a remote `docker-compose.yml`; that host-side Compose file is not present in this repository. Ensure the target host, ECR repositories, image deployment configuration, and required database environment are provisioned consistently before dispatching these workflows.
-
-## API and health checks
-
-| Method | Path | Behavior |
+| Stage | Backend workflow — `backend_pipe.yml` | Frontend workflow — `frontend_pipeline.yml` |
 | --- | --- | --- |
-| `GET` | `/health` | Returns HTTP 200 with `{ "status": "healthy", "timestamp": ... }`. This is a process-level check and does not query the database. |
-| `GET` | `/api/data` | Runs `SELECT NOW()` and returns a greeting plus the database time. On query failure, returns HTTP 500. |
+| **Build / setup** | Checks out the repository and sets up Node.js `20`. | Checks out the repository. |
+| **Test** | Runs `npm install`, `node --check server.js`, and `npm test --if-present` in `app/backend`. | No separate frontend test step is configured. |
+| **Package** | Builds a Docker image and pushes tag `v1.0.<run number>` to ECR repository `electro_backend`. | Builds a Docker image and pushes tag `v1.0.<run number>` to ECR repository `electro_frontend`. |
+| **Deploy** | Looks up a running EC2 instance tagged `Name=Test`, SSHes as `ubuntu`, logs in to ECR, updates the backend image reference in `/home/ubuntu/docker-compose.yml`, then pulls/recreates the backend container and prunes unused images. | Looks up a running EC2 instance tagged `Name=Test`, SSHes as `ubuntu`, logs in to ECR, updates the frontend image reference in `/home/ubuntu/docker-compose.yml`, then pulls/recreates the frontend container and prunes unused images. |
 
-Examples when the API is reachable on local port `5000`:
+Both image workflows use AWS region **`us-east-1`** and registry **`557496517532.dkr.ecr.us-east-1.amazonaws.com`**. ECR repositories are configured in the workflows, not provisioned by Terraform. The backend workflow triggers on pushes to `main` affecting `app/backend/**` or manual dispatch; its watched workflow path is `.github/workflows/backend.yml`, while the actual file is `backend_pipe.yml`. The frontend workflow triggers on pushes to `main` affecting `app/frontend/**` or manual dispatch.
+
+<details>
+<summary>Detailed application workflow steps and deployment commands</summary>
+
+**Backend (`backend_pipe.yml`):**
+
+1. Runs on `ubuntu-latest`, checks out the repository, and sets up Node.js `20`.
+2. In `app/backend/`, runs `npm install`, `node --check server.js`, and `npm test --if-present`.
+3. Configures AWS credentials, logs into ECR with `aws-actions/amazon-ecr-login@v2`, then builds and pushes:
+
+   ```bash
+   docker build -t "$REGISTRY/$REPO:$IMAGE_TAG" .
+   docker push "$REGISTRY/$REPO:$IMAGE_TAG"
+   ```
+
+4. Uses `aws ec2 describe-instances` with `Name=tag:Name,Values=Test` and `Name=instance-state-name,Values=running` to locate a public IP; the job fails if none is found.
+5. Uses `appleboy/ssh-action@v1.0.3` to connect as `ubuntu` with `EC2_SSH_KEY`, authenticate Docker to ECR, update the image tag in `/home/ubuntu/docker-compose.yml`, and redeploy:
+
+   ```bash
+   docker compose pull backend
+   docker compose up -d --no-deps --force-recreate backend
+   docker image prune -f
+   docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+   ```
+
+**Frontend (`frontend_pipeline.yml`):**
+
+1. Runs on `ubuntu-latest` and checks out the repository. No Node setup or test step is configured.
+2. Configures AWS credentials, logs into ECR, and builds/pushes the frontend image using `REPO=electro_frontend` and the same `v1.0.<run number>` tag scheme.
+3. Performs the same `Name=Test` running-instance/public-IP lookup and uses `appleboy/ssh-action@v1.0.3` with `EC2_SSH_KEY`.
+4. Updates the `electro_frontend` image tag in the remote Compose file, then runs `docker compose pull frontend`, `docker compose up -d --no-deps --force-recreate frontend`, `docker image prune -f`, and the same `docker ps` status listing.
+
+</details>
+
+The infrastructure workflow **`infra.yml`** is manually dispatched. It sets up Terraform `1.13`, then initializes, validates, plans, and applies the VPC, permissions, EC2, and RDS layers in order. The manually dispatched **`destroy_ifra_prod.yml`** workflow destroys RDS, EC2, permissions, then VPC. Both infrastructure workflows configure AWS credentials for `us-east-1`; they pass DB credentials as Terraform environment variables for the RDS layer.
+
+> **Deployment prerequisites to verify:** app workflows search for an instance tagged `Name=Test`, but Terraform names instances `Bastion_Host`, `Application_Tier`, and `Web_Tier`. The workflows also expect a host-side `/home/ubuntu/docker-compose.yml`, which is not the repository's empty `app/docker_compose.yml`. Confirm the target host, ECR repositories, Compose deployment file, and backend DB environment before dispatching either workflow.
+
+### 🔐 Secrets management
+
+Add the required secrets under **Repository Settings → Secrets and variables → Actions**. GitHub Actions references them through the secrets context rather than hardcoding credential values in the workflow files.
+
+| Secret | Purpose | Required by |
+| --- | --- | --- |
+| `AWS_ACCESS_KEY_ID` | AWS access key used by workflows to authenticate. | Backend image publish/deploy, frontend image publish/deploy, Terraform apply/destroy. |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key used with the access key. | Backend image publish/deploy, frontend image publish/deploy, Terraform apply/destroy. |
+| `DB_USERNAME` | Passed as `TF_VAR_db_username` to the Terraform RDS layer. | Infrastructure apply and destroy workflows. |
+| `DB_PASSWORD` | Passed as `TF_VAR_db_password` to the Terraform RDS layer. | Infrastructure apply and destroy workflows. |
+| `EC2_SSH_KEY` | SSH private key for remote container deployment. | Backend and frontend image workflows. |
+
+Use narrowly scoped AWS credentials. Terraform's sensitive variables do not prevent values from being stored in state, so secure the S3 backend and restrict access to it.
+
+---
+
+## 📡 API reference
+
+| Method | Endpoint | Behavior | Sample response |
+| --- | --- | --- | --- |
+| `GET` | `/health` | Process-level check; returns HTTP `200` and does not query PostgreSQL. | `{"status":"healthy","timestamp":"<current timestamp>"}` |
+| `GET` | `/api/data` | Executes `SELECT NOW()` and returns a greeting with the database time. Returns HTTP `500` if the DB query fails. | `{"message":"Hello from the Backend API!","db_time":"<database timestamp>"}` |
+
+Run the API on port `5000` and query it directly:
 
 ```bash
 curl http://localhost:5000/health
 curl http://localhost:5000/api/data
 ```
 
-Through the Nginx frontend, `/api/data` is proxied to the API:
+When Nginx is available on port `80`, the API route can also be requested through the frontend:
 
 ```bash
 curl http://localhost/api/data
 ```
 
-Nginx only proxies `/api/`; `/health` is served by Express on the API listener and is not routed by the checked-in Nginx configuration.
+Nginx proxies `/api/` only. `/health` is served by Express on the API listener and is not routed through the checked-in Nginx configuration.
