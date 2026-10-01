@@ -9,7 +9,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket = "7ader-terraform"
+    bucket = "electro-terraform"
     key    = "rds/terraform.tfstate"
     region = "us-east-1"
   }
@@ -23,7 +23,7 @@ data "terraform_remote_state" "ec2" {
   backend = "s3"
 
   config = {
-    bucket = "7ader-terraform"
+    bucket = "electro-terraform"
     key    = "ec2/terraform.tfstate"
     region = "us-east-1"
   }
@@ -32,7 +32,7 @@ data "terraform_remote_state" "vpc" {
   backend = "s3"
 
   config = {
-    bucket = "7ader-terraform"
+    bucket = "electro-terraform"
     key    = "vpc/terraform.tfstate"
     region = "us-east-1"
   }
