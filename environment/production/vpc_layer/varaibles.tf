@@ -19,11 +19,6 @@ variable "azs" {
   description = "List of AZs for subnets"
   type        = list(string)
 }
-# variable "bastion_ip" {
-#   description = "The IP address to the bastion host"
-#   type        = string
-
-# }
 
 variable "enable_dns_hostnames" {
   description = "Enable DNS hostnames in the VPC"

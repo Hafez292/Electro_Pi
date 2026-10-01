@@ -37,22 +37,22 @@ jobs:
                terraform plan -out=tfplan
                terraform apply -auto-approve tfplan
               working-directory: ./environment/production/vpc_layer
-            # - name: Terraform _Init_ Permissions
-            #   run: |
-            #    terraform init
-            #    terraform validate
-            #    terraform plan -out=tfplan
-            #    terraform apply -auto-approve tfplan
-            #   working-directory: ./environment/production/permission_layer
+            - name: Terraform _Init_ Permissions
+              run: |
+               terraform init
+               terraform validate
+               terraform plan -out=tfplan
+               terraform apply -auto-approve tfplan
+              working-directory: ./environment/production/permission_layer
 
             
-            # - name: Terraform_Init_ec2_layer
-            #   run: |
-            #         terraform init
-            #         terraform validate
-            #         terraform plan -out=tfplan
-            #         terraform apply -auto-approve tfplan
-            #   working-directory: ./environment/production/ec2_layer
+            - name: Terraform_Init_ec2_layer
+              run: |
+                    terraform init
+                    terraform validate
+                    terraform plan -out=tfplan
+                    terraform apply -auto-approve tfplan
+              working-directory: ./environment/production/ec2_layer
             
             # - name: Terraform_Init_alb_layer
             #   run: |
