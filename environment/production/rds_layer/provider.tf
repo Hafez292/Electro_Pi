@@ -28,6 +28,15 @@ data "terraform_remote_state" "ec2" {
     region = "us-east-1"
   }
 }
+data "terraform_remote_state" "permission" {
+  backend = "s3"
+
+  config = {
+    bucket = "electro-terraform"
+    key    = "permission/terraform.tfstate"
+    region = "us-east-1"
+  }
+}
 data "terraform_remote_state" "vpc" {
   backend = "s3"
 
