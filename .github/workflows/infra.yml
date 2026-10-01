@@ -1,0 +1,74 @@
+name: infra_prod_pipeline
+on:
+    push:
+        branches:
+            - main
+        # paths:
+        #     - 'stage/**'
+    workflow_dispatch:
+jobs:
+    Deploy:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+              
+            - name: Configure AWS credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                aws-region: us-east-1
+         
+            - name: Setup_Terraform
+              uses: hashicorp/setup-terraform@v3
+              with:
+                  terraform_version:  1.13
+                 
+            - name: Check Terraform version (after setup)
+              run: |
+                which terraform
+                terraform version
+
+            - name: Terraform_Init_vpc_layer
+              run: |
+               terraform init
+               terraform validate
+               terraform plan -out=tfplan
+               terraform apply -auto-approve tfplan
+              working-directory: ./environment/production/vpc_layer
+            # - name: Terraform _Init_ Permissions
+            #   run: |
+            #    terraform init
+            #    terraform validate
+            #    terraform plan -out=tfplan
+            #    terraform apply -auto-approve tfplan
+            #   working-directory: ./environment/production/permission_layer
+
+            
+            # - name: Terraform_Init_ec2_layer
+            #   run: |
+            #         terraform init
+            #         terraform validate
+            #         terraform plan -out=tfplan
+            #         terraform apply -auto-approve tfplan
+            #   working-directory: ./environment/production/ec2_layer
+            
+            # - name: Terraform_Init_alb_layer
+            #   run: |
+            #         terraform init
+            #         terraform validate
+            #         terraform plan -out=tfplan
+            #         terraform apply -auto-approve tfplan
+            #   working-directory: ./environment/production/alb_layer
+            
+            # - name: Terraform_Init_rds_layer
+            #   run: |
+            #         terraform init
+            #         terraform validate
+            #         terraform plan -out=tfplan
+            #         terraform apply -auto-approve tfplan
+            #   env:
+            #     TF_VAR_db_username: ${{ secrets.DB_USERNAME }}
+            #     TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+            #   working-directory: ./environment/production/rds_layer
