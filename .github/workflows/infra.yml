@@ -1,6 +1,6 @@
 name: infra_prod_pipeline
 on:
-    push:
+    # push:
         # branches:
         #     - main
         # paths:
