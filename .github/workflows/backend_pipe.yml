@@ -72,7 +72,7 @@ jobs:
               docker login --username AWS --password-stdin \
               557496517532.dkr.ecr.us-east-1.amazonaws.com
 
-            cd /home/ubuntu/app
+            cd /home/ubuntu
 
             sed -i "s|image: 557496517532.dkr.ecr.us-east-1.amazonaws.com/electro_backend:[^ ]*|image: 557496517532.dkr.ecr.us-east-1.amazonaws.com/electro_backend:v1.0.${{ github.run_number }}|g" docker-compose.yml
 
