@@ -1,8 +1,8 @@
 name: infra_prod_pipeline
 on:
     push:
-        branches:
-            - main
+        # branches:
+        #     - main
         # paths:
         #     - 'stage/**'
     workflow_dispatch:
