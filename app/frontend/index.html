@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3-Tier Application Demo</title>
+    <style>
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: #f4f6f8; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: #ffffff; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 480px; width: 100%; text-align: center; }
+        h1 { color: #111827; font-size: 1.5rem; margin-bottom: 0.5rem; }
+        p { color: #4b5563; line-height: 1.5; }
+        .status-box { margin-top: 1.5rem; padding: 1rem; border-radius: 8px; background-color: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; font-weight: 500; font-size: 0.95rem; }
+        .status-box.error { background-color: #fef2f2; border-color: #fecaca; color: #991b1b; }
+        button { margin-top: 1.5rem; background-color: #2563eb; color: #ffffff; border: none; padding: 0.75rem 1.5rem; font-size: 0.9rem; font-weight: 600; border-radius: 6px; cursor: pointer; transition: background-color 0.2s; }
+        button:hover { background-color: #1d4ed8; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Three-Tier Web Application</h1>
+        <p>This frontend communicates with the backend API container running on AWS ECS.</p>
+        
+        <div id="status" class="status-box">Connecting to Backend API...</div>
+        
+        <button onclick="fetchData()">Ping API</button>
+    </div>
+
+    <script>
+        async function fetchData() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'status-box';
+            statusDiv.innerText = 'Requesting data...';
+
+            try {
+                // Calls backend API endpoint relative path
+                const response = await fetch('/api/data');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                statusDiv.innerHTML = `<strong>Backend Connected!</strong><br>Message: ${data.message}<br><small>DB Time: ${data.db_time}</small>`;
+            } catch (err) {
+                statusDiv.className = 'status-box error';
+                statusDiv.innerText = 'Failed to connect to backend API.';
+                console.error(err);
+            }
+        }
+
+        fetchData();
+    </script>
+</body>
+</html>

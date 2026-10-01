@@ -1,0 +1,82 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/backend/**'
+      - '.github/workflows/backend.yml'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  REGISTRY: 557496517532.dkr.ecr.us-east-1.amazonaws.com
+  REPO: electro_backend
+  IMAGE_TAG: v1.0.${{ github.run_number }}
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: app/backend/package-lock.json
+
+      - name: Install and test
+        working-directory: ./app/backend
+        run: |
+          npm ci
+          npm test
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push backend image
+        working-directory: ./app/backend
+        run: |
+          docker build -t $REGISTRY/$REPO:$IMAGE_TAG .
+          docker push $REGISTRY/$REPO:$IMAGE_TAG
+
+      - name: Get Public IP
+        run: |
+          PUBLIC_IP=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=Test" "Name=instance-state-name,Values=running" \
+            --query "Reservations[].Instances[].PublicIpAddress" \
+            --output text)
+          [ -n "$PUBLIC_IP" ] || { echo "No running instance found"; exit 1; }
+          echo "PUBLIC_IP=$PUBLIC_IP" >> $GITHUB_ENV
+
+      - name: Deploy backend to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ env.PUBLIC_IP }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          script: |
+            aws ecr get-login-password --region us-east-1 | \
+              docker login --username AWS --password-stdin \
+              557496517532.dkr.ecr.us-east-1.amazonaws.com
+
+            cd /home/ubuntu/app
+
+            sed -i "s|image: 557496517532.dkr.ecr.us-east-1.amazonaws.com/electro_backend:[^ ]*|image: 557496517532.dkr.ecr.us-east-1.amazonaws.com/electro_backend:v1.0.${{ github.run_number }}|g" docker-compose.yml
+
+            docker compose pull backend
+            docker compose up -d --no-deps --force-recreate backend
+            docker image prune -f
+            docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
