@@ -41,7 +41,7 @@
                 }
 
                 const data = await response.json();
-                statusDiv.innerHTML = `<strong>Backend Connected!</strong><br>Message: ${data.message}<br><small>DB Time: ${data.db_time}</small>`;
+                statusDiv.innerHTML = `<strong>Backend Connected!!</strong><br>Message: ${data.message}<br><small>DB Time: ${data.db_time}</small>`;
             } catch (err) {
                 statusDiv.className = 'status-box error';
                 statusDiv.innerText = 'Failed to connect to backend API.';
