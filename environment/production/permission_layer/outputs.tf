@@ -11,9 +11,7 @@ output "ec2_sg"{
 output "public_sg"{
     value = aws_security_group.sg_public_user.id
 }
-output "sg_alb"{
-    value = aws_security_group.sg_alb.id
-}
+
 output "sg_rds"{
     value = aws_security_group.sg_rds.id
 }
