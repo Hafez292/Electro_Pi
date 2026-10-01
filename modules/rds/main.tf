@@ -10,11 +10,11 @@ resource "aws_db_subnet_group" "rds" {
   }
 }
 
-# 2. Main Amazon RDS MS SQL Express Core Definition Engine
+# 2. Main Amazon RDS Engine
 resource "aws_db_instance" "db" {
   identifier           = var.identifier
-  engine               = "sqlserver-ex"      # Amazon RDS Engine Type: MSSQL Express Edition
-  engine_version       = "16.00.4245.2.v1"   # SQL Server 2019 baseline version (Modify as preferred)
+  engine               = "postgres"     
+  engine_version       = "16.3"   
   instance_class       = var.instance_class
   
   # Credentials & Storage parameters
@@ -39,8 +39,8 @@ resource "aws_db_instance" "db" {
   monitoring_interval                   = 0    
   monitoring_role_arn                   = null 
 
-  # Standard operational requirements for Express instances
-  license_model        = "license-included"
+  # Standard operational requirements 
+  license_model        = "general-public-license"
   skip_final_snapshot  = true
   multi_az = false 
 

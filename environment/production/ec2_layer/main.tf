@@ -18,7 +18,7 @@ module "private_ec2" {
   subnet_id         = element(data.terraform_remote_state.vpc.outputs.private_subnet_ids, 0)
   security_group_id = data.terraform_remote_state.permission.outputs.ec2_sg
   instance_type     = var.instance_type
-  enable_ip         = true
+  enable_ip         = false
   key_name          = var.key_name
   instance_name     = "Application_Tier"
   iam_instance_profile = data.terraform_remote_state.permission.outputs.ec2_instance_profile

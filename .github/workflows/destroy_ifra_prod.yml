@@ -29,23 +29,16 @@ jobs:
               run: |
                 which terraform
                 terraform version
-
-            # - name: Terraform_Destroy_alb_layer
-            #   run: |
-            #         terraform init
-            #         terraform validate
-            #         terraform destroy -auto-approve 
-            #   working-directory: ./environment/production/alb_layer
-            
-            # - name: Terraform_Init_rds_layer
-            #   run: |
-            #         terraform init
-            #         terraform validate
-            #         terraform destroy -auto-approve 
-            #   env:
-            #     TF_VAR_db_username: ${{ secrets.DB_USERNAME }}
-            #     TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
-            #   working-directory: ./environment/production/rds_layer
+ 
+            - name: Terraform_Init_rds_layer
+              run: |
+                    terraform init
+                    terraform validate
+                    terraform destroy -auto-approve 
+              env:
+                TF_VAR_db_username: ${{ secrets.DB_USERNAME }}
+                TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+              working-directory: ./environment/production/rds_layer
 
             - name: Terraform_destroy_ec2_layer
               run: |
