@@ -49,10 +49,3 @@ resource "aws_db_instance" "db" {
     Environment = var.environment
   }
 }
-
-# 3. Associate your existing IAM role execution profile directly to the engine cluster
-resource "aws_db_instance_role_association" "rds_iam_role" {
-  db_instance_identifier = aws_db_instance.db.identifier
-  role_arn               = var.existing_iam_role_arn
-  feature_name           = var.iam_feature_name
-}

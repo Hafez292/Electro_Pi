@@ -43,16 +43,6 @@ variable "db_password" {
   sensitive   = true 
 }
 
-variable "existing_iam_role_arn" {
-  description = "The target ARN of an already existing IAM operational or execution role to attach"
-  type        = string
-}
-
-variable "iam_feature_name" {
-  description = "The system feature utilizing the IAM role association (e.g., S3_INTEGRATION for backups/restores)"
-  type        = string
-  default     = "S3_INTEGRATION"
-}
 
 variable "environment" {
   description = "Deployment lifestyle classification context tag"
