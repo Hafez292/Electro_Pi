@@ -6,6 +6,31 @@
 ![Docker](https://img.shields.io/badge/Containers-Docker-2496ED?logo=docker&logoColor=white)
 ![AWS](https://img.shields.io/badge/Cloud-AWS-232F3E?logo=amazonaws&logoColor=white)
 
+## 🗂️ Repository hierarchy
+
+```text
+Electro Pi/
+├── .github/
+│   └── workflows/
+├── app/
+│   ├── backend/
+│   ├── frontend/
+│   └── docker_compose.yml
+├── environment/
+│   └── production/
+│       ├── ec2_layer/
+│       ├── permission_layer/
+│       ├── rds_layer/
+│       └── vpc_layer/
+├── modules/
+│   ├── ec2/
+│   ├── rds/
+│   └── vpc/
+├── README.md
+├── CANDIDATE_ASSESSMENT_SOLUTION.md
+└── .git/
+```
+
 Electro Pi is a three-tier web application assessment project with a static Nginx frontend, a Node.js/Express API, and PostgreSQL. Terraform provisions AWS networking, EC2, IAM/security-group resources, and a private RDS database, while GitHub Actions provides application-image deployment and infrastructure workflows.
 
 > **Deployment note:** the intended application flow is Nginx → Express API → PostgreSQL. The checked-in AWS deployment provisions EC2 and deploys to EC2 over SSH; there is no ECS service or task definition in this repository. The Compose file is empty, and some local/production capabilities are not yet configured; those limitations are called out below.
