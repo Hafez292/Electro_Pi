@@ -73,13 +73,17 @@ The repository is designed around a simple three-tier flow: a static frontend, a
    docker run --rm -p 80:80 electro-frontend
    ```
 
-3. Use Docker Compose once the file is populated with services:
+3. Run the project with Docker Compose using the repository-managed app services:
 
    ```bash
-   docker compose -f app/docker_compose.yml up --build
+   export RDS_HOSTNAME=your-rds-hostname
+   export RDS_PASSWORD=your-rds-password
+   docker compose -f app/docker_compose.yml up -d
+   docker compose -f app/docker_compose.yml logs --follow
+   docker compose -f app/docker_compose.yml down
    ```
 
-   The current `app/docker_compose.yml` is intentionally empty, so a full local stack is not runnable until services, networking, and environment variables are added.
+   The Compose file is intentionally minimal: it starts the frontend and backend containers, expects an existing PostgreSQL/RDS endpoint via `RDS_HOSTNAME`, and does not run a local database container for the assessment scope.
 
 ### Cloud deployment
 
@@ -120,7 +124,7 @@ The production cloud design is provisioned with Terraform under `environment/pro
 
 ## ⚠️ Trade-offs and time-limit constraints
 
-- The local Compose stack is intentionally not ready: `app/docker_compose.yml` is empty, so there is no complete local multi-container stack yet.
+- The Compose stack is intentionally lightweight: it launches only the frontend and backend services and relies on an external PostgreSQL/RDS database instead of bundling a local database container. This keeps deployment simple while preserving the intended three-tier separation.
 - The architecture chooses a minimal API surface instead of a richer service layer; this keeps setup lightweight and avoids unnecessary abstraction for a small assessment project.
 - Cloud deployment is simplified to EC2 and RDS rather than a fully managed container orchestration service, which reduces operational complexity for the current scope but gives up some resilience and autoscaling features.
 - Observability, security hardening, and production reliability patterns are intentionally limited: there is no full monitoring stack, no advanced auth model, and no full database migration workflow in the checked-in code.
