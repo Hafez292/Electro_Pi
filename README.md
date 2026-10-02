@@ -14,7 +14,14 @@ Electro Pi/
 │   └── workflows/
 ├── app/
 │   ├── backend/
+│   │   ├── Dockerfile
+│   │   ├── package.json
+│   │   ├── server.js
+│   │   └── unit.js
 │   ├── frontend/
+│   │   ├── Dockerfile
+│   │   ├── index.html
+│   │   └── nginx.conf
 │   └── docker_compose.yml
 ├── environment/
 │   └── production/
@@ -27,7 +34,6 @@ Electro Pi/
 │   ├── rds/
 │   └── vpc/
 ├── README.md
-├── CANDIDATE_ASSESSMENT_SOLUTION.md
 └── .git/
 ```
 
