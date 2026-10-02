@@ -37,6 +37,94 @@ Electro Pi/
 └── .git/
 ```
 
+## ⚙️ Running the project
+
+### Local development
+
+The repository is designed around a simple three-tier flow: a static frontend, a Node.js API, and a PostgreSQL database.
+
+1. Start the backend service:
+
+   ```bash
+   cd app/backend
+   npm install
+   export DB_HOST=localhost
+   export DB_USER=postgres
+   export DB_PASSWORD=yourpassword
+   export DB_NAME=appdnb
+   export DB_PORT=5432
+   npm start
+   ```
+
+   Once running, verify the health check and data endpoint:
+
+   ```bash
+   curl http://localhost:5000/health
+   curl http://localhost:5000/api/data
+   ```
+
+2. Serve the frontend:
+
+   - The static page is served by the browser directly from `app/frontend/index.html`, or
+   - build and run the container image:
+
+   ```bash
+   docker build -t electro-frontend ./app/frontend
+   docker run --rm -p 80:80 electro-frontend
+   ```
+
+3. Use Docker Compose once the file is populated with services:
+
+   ```bash
+   docker compose -f app/docker_compose.yml up --build
+   ```
+
+   The current `app/docker_compose.yml` is intentionally empty, so a full local stack is not runnable until services, networking, and environment variables are added.
+
+### Cloud deployment
+
+The production cloud design is provisioned with Terraform under `environment/production/` and deployed with GitHub Actions.
+
+1. Prepare the required AWS prerequisites:
+   - an existing S3 remote-state bucket named `electro-terraform` in `us-east-1`
+   - a valid EC2 key pair configured in `environment/production/ec2_layer/terraform.tfvars`
+   - AWS credentials available to Terraform and the GitHub Action runners
+
+2. Apply the infrastructure layers in order:
+
+   ```bash
+   terraform -chdir=environment/production/vpc_layer init
+   terraform -chdir=environment/production/vpc_layer apply
+
+   terraform -chdir=environment/production/permission_layer init
+   terraform -chdir=environment/production/permission_layer apply
+
+   terraform -chdir=environment/production/rds_layer init
+   terraform -chdir=environment/production/rds_layer apply
+
+   terraform -chdir=environment/production/ec2_layer init
+   terraform -chdir=environment/production/ec2_layer apply
+   ```
+
+3. Deploy application images through the workflow files in `.github/workflows/`:
+   - `backend_pipe.yml` builds and pushes the backend image to Amazon ECR and deploys it to the EC2 host over SSH.
+   - `frontend_pipeline.yml` does the same for the statically served frontend.
+
+## 🧭 Architectural decisions and rationale
+
+- Simple three-tier separation: presentation, application, and data are kept independent so the frontend, API, and database can evolve without coupling each layer to the others.
+- Nginx as the public entry point: it serves the static UI and forwards `/api/*` requests to the backend, which is a clean and low-cost pattern for a demo workload.
+- Express + PostgreSQL integration: the backend keeps the database access logic centralized in one service, using a connection pool and a small `/api/data` query that demonstrates the end-to-end path.
+- Terraform layered by concern: networking, permissions, RDS, and EC2 are split into separate directories to align with infrastructure responsibilities and make the deployment easier to reason about.
+- CI/CD through GitHub Actions to EC2: the repository targets EC2-based deployment rather than ECS/Kubernetes to match the checked-in infrastructure and keep the workload straightforward for an assessment.
+
+## ⚠️ Trade-offs and time-limit constraints
+
+- The local Compose stack is intentionally not ready: `app/docker_compose.yml` is empty, so there is no complete local multi-container stack yet.
+- The architecture chooses a minimal API surface instead of a richer service layer; this keeps setup lightweight and avoids unnecessary abstraction for a small assessment project.
+- Cloud deployment is simplified to EC2 and RDS rather than a fully managed container orchestration service, which reduces operational complexity for the current scope but gives up some resilience and autoscaling features.
+- Observability, security hardening, and production reliability patterns are intentionally limited: there is no full monitoring stack, no advanced auth model, and no full database migration workflow in the checked-in code.
+
 Electro Pi is a three-tier web application assessment project with a static Nginx frontend, a Node.js/Express API, and PostgreSQL. Terraform provisions AWS networking, EC2, IAM/security-group resources, and a private RDS database, while GitHub Actions provides application-image deployment and infrastructure workflows.
 
 > **Deployment note:** the intended application flow is Nginx → Express API → PostgreSQL. The checked-in AWS deployment provisions EC2 and deploys to EC2 over SSH; there is no ECS service or task definition in this repository. The Compose file is empty, and some local/production capabilities are not yet configured; those limitations are called out below.
